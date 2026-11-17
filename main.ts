@@ -13,7 +13,7 @@
 // Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
 //   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts --input ../input/snapshot.json
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { boardIssue, buildRadar, dataScript, parseSnapshot } from './lib/model.ts';
@@ -49,14 +49,32 @@ if (issue !== null) {
   process.stderr.write(`token radar: the model wrote a board the gate refuses: ${issue}\n`);
   process.exit(1);
 }
+const traded = board.filter((r) => r.mcap_usd !== null || r.gecko_id !== null || r.symbol !== null);
+if (traded.length > 0) {
+  process.stderr.write(`token radar: ${traded.length} board row${traded.length === 1 ? '' : 's'} records a token, so it is not a pre-token subject: ${traded.slice(0, 3).map((r) => r.slug).join(', ')}\n`);
+  process.exit(1);
+}
+
+/** A dollar figure that reads in one line, for the run's own report. */
+function money(n: number): string {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${n}`;
+}
 
 mkdirSync(out, { recursive: true });
 writeFileSync(join(out, 'board.json'), `${JSON.stringify({ rows: board })}\n`);
 writeFileSync(join(out, 'data.js'), dataScript(radar));
 
-/** Copy one directory's regular files into `to`, skipping names that start with a dot. */
+/**
+ * Copy one directory's regular files into `to`, skipping names that start with a dot. The destination
+ * is cleared first: a rerun must not inherit a file the previous run wrote, or the dossier would carry
+ * a page the model no longer produces.
+ */
 function copyFiles(from: string, to: string): string[] {
   if (!existsSync(from)) return [];
+  rmSync(to, { recursive: true, force: true });
   mkdirSync(to, { recursive: true });
   const copied: string[] = [];
   for (const name of readdirSync(from)) {
@@ -69,8 +87,12 @@ function copyFiles(from: string, to: string): string[] {
   return copied;
 }
 
-copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
+const dashFiles = copyFiles(join(here, 'dashboard'), join(out, 'dashboard'));
 const shots = copyFiles(join(here, 'screenshots'), join(out, 'screenshots'));
+if (dashFiles.length === 0) {
+  process.stderr.write('token radar: dashboard/ holds no page: the judge needs index.html, a .css and a .js\n');
+  process.exit(1);
+}
 if (shots.length < 3) {
   process.stderr.write(`token radar: screenshots/ holds ${shots.length} image${shots.length === 1 ? '' : 's'}: hand in 3, the board, a detail view and a filtered view\n`);
   process.exit(1);
@@ -85,7 +107,14 @@ for (const name of shots) {
 // The dossier is written last: the scorer rebuilds it from this /output and compares bytes.
 writeFileSync(join(out, 'dossier.json'), buildDossier(out, { text_max_bytes: TEXT_MAX_BYTES, screenshots: SCREENSHOT_CAPS, dashboard: { max_files: 400, max_bytes: 4_194_304 } }));
 
+const top = board
+  .slice(0, 5)
+  .map((r) => `#${r.rank} ${r.name} ${money(r.implied_value_usd)} (${money(r.implied_low_usd)}-${money(r.implied_high_usd)})`)
+  .join('; ');
+const cal = radar.calibration;
 process.stdout.write(
-  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
-    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (3 files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
+  `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} pre-token rows scored (${radar.early_size} early, ${radar.live_size} live set aside)\n` +
+    `token radar: model ${radar.model_version} calibrated on ${cal.sample_size} live tokens: median ${cal.market_ratio} mcap/TVL, p90 ${cal.ratio_p90}, cap ${money(cal.max_live_mcap)}\n` +
+    `token radar: top five: ${top}\n` +
+    `token radar: wrote ${join(out, 'board.json')}, ${join(out, 'data.js')}, ${join(out, 'dashboard')} (${dashFiles.length} files), ${join(out, 'screenshots')} (${shots.length} images) and ${join(out, 'dossier.json')}\n`,
 );
