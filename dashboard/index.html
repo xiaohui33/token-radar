@@ -3,12 +3,42 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Token Radar: pre-token protocols ranked by implied value</title>
+<title>Token Radar: pre-token protocols by implied value</title>
+<meta name="description" content="A static, offline board of protocols with no token, scored from the DefiLlama snapshot.">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<a class="skip" href="#board">Skip to the board</a>
-<main id="board" tabindex="-1" aria-busy="true"></main>
+<a class="skip" href="#main">Skip to the board</a>
+
+<header class="top">
+  <div class="shell top-inner">
+    <p class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="brand-name">Token Radar</span>
+    </p>
+    <p class="top-meta">
+      <span>Snapshot <time id="as-of">2026-11-14</time></span>
+      <span>DefiLlama protocol index</span>
+      <span id="model-version">radar-2</span>
+    </p>
+  </div>
+</header>
+
+<main id="main" class="shell" tabindex="-1" aria-busy="true">
+  <p class="loading">Loading the board&hellip;</p>
+</main>
+
+<footer class="foot shell">
+  <p>Every figure on this page is computed from one sealed snapshot and written into <code>data.js</code> beside the page. No network requests, no fonts, no analytics: open it from disk and it works.</p>
+  <p class="sub">Source: <span id="source">DefiLlama protocol index</span>. Implied values are model estimates, not prices.</p>
+</footer>
+
+<noscript>
+  <p class="noscript">This board is rendered by <code>app.js</code> from <code>data.js</code>; it needs JavaScript enabled. The same numbers are in <code>board.json</code>.</p>
+</noscript>
+
+<p id="status" class="visually-hidden" role="status" aria-live="polite"></p>
+
 <script src="../data.js"></script>
 <script src="app.js"></script>
 </body>
